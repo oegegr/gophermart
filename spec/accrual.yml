@@ -1,0 +1,51 @@
+openapi: 3.0.0
+info:
+  title: Accrual System API
+  version: 1.0.0
+  description: API for accrual system
+
+servers:
+  - url: http://localhost:8081
+    description: Accrual system server
+
+paths:
+  /api/orders/{number}:
+    get:
+      summary: Get order information
+      parameters:
+        - name: number
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccrualOrderResponse'
+        '204':
+          description: Order not found
+        '429':
+          description: Too many requests
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+              description: Seconds to wait before next request
+        '500':
+          description: Internal server error
+
+components:
+  schemas:
+    AccrualOrderResponse:
+      type: object
+      properties:
+        order:
+          type: string
+        status:
+          type: string
+          enum: [REGISTERED, INVALID, PROCESSING, PROCESSED]
+        accrual:
+          type: number
