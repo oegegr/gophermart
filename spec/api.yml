@@ -1,0 +1,232 @@
+openapi: 3.0.0
+info:
+  title: Gophermart Loyalty System API
+  version: 1.0.0
+  description: API for Gophermart loyalty system
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+paths:
+  /api/user/register:
+    post:
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+      responses:
+        '200':
+          description: User successfully registered
+        '400':
+          description: Invalid input
+        '409':
+          description: User already exists
+        '500':
+          description: Internal server error
+
+  /api/user/login:
+    post:
+      summary: Authenticate user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+      responses:
+        '200':
+          description: Successfully authenticated
+          headers:
+            Authorization:
+              schema:
+                type: string
+              description: JWT token for authentication
+        '401':
+          description: Invalid credentials
+        '500':
+          description: Internal server error
+
+  /api/user/orders:
+    post:
+      summary: Upload order number
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+              example: "1234567890"
+      responses:
+        '202':
+          description: Order accepted for processing
+        '400':
+          description: Invalid order number
+        '401':
+          description: Unauthorized
+        '409':
+          description: Order already uploaded
+        '422':
+          description: Invalid order number format
+        '500':
+          description: Internal server error
+
+    get:
+      summary: Get user's orders
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of user's orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '204':
+          description: No orders found
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/user/balance:
+    get:
+      summary: Get user's balance
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User's balance information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+  /api/user/balance/withdraw:
+    post:
+      summary: Withdraw points from balance
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WithdrawalRequest'
+      responses:
+        '200':
+          description: Withdrawal successful
+        '401':
+          description: Unauthorized
+        '402':
+          description: Insufficient funds
+        '422':
+          description: Invalid order number
+        '500':
+          description: Internal server error
+
+  /api/user/withdrawals:
+    get:
+      summary: Get user's withdrawals history
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of withdrawals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Withdrawal'
+        '204':
+          description: No withdrawals found
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserRegistration:
+      type: object
+      required:
+        - login
+        - password
+      properties:
+        login:
+          type: string
+        password:
+          type: string
+
+    UserLogin:
+      type: object
+      required:
+        - login
+        - password
+      properties:
+        login:
+          type: string
+        password:
+          type: string
+
+    Order:
+      type: object
+      properties:
+        number:
+          type: string
+        status:
+          type: string
+          enum: [REGISTERED, INVALID, PROCESSING, PROCESSED]
+        accrual:
+          type: number
+        uploaded_at:
+          type: string
+          format: date-time
+
+    Balance:
+      type: object
+      properties:
+        current:
+          type: number
+        withdrawn:
+          type: number
+
+    WithdrawalRequest:
+      type: object
+      required:
+        - order
+        - sum
+      properties:
+        order:
+          type: string
+        sum:
+          type: number
+
+    Withdrawal:
+      type: object
+      properties:
+        order:
+          type: string
+        sum:
+          type: number
+        processed_at:
+          type: string
+          format: date-time
