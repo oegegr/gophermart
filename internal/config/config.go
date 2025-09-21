@@ -17,10 +17,10 @@ func LoadConfig() *Config {
 
 	flag.StringVar(&cfg.RunAddress, "a", "localhost:8080", "Address and port to run server")
 	flag.StringVar(&cfg.DatabaseURI, "d", "", "Database connection string")
-	flag.StringVar(&cfg.AccrualSystemAddress, "r", "http://localhost:8081", "Accrual system address")
+	flag.StringVar(&cfg.AccrualSystemAddress, "r", "http://localhost:}8081", "Accrual system address")
+	flag.StringVar(&cfg.JWTSecret, "s", "jwt-secret-key", "jwt secret key")
 	flag.Parse()
 
-	// Переопределение флагов переменными окружения
 	if envRunAddr := os.Getenv("RUN_ADDRESS"); envRunAddr != "" {
 		cfg.RunAddress = envRunAddr
 	}
@@ -31,11 +31,8 @@ func LoadConfig() *Config {
 		cfg.AccrualSystemAddress = envAccrualAddr
 	}
 
-	// Секрет для JWT (лучше хранить в переменных окружения)
 	if secret := os.Getenv("JWT_SECRET"); secret != "" {
 		cfg.JWTSecret = secret
-	} else {
-		cfg.JWTSecret = "default-secret-key-change-in-production"
 	}
 
 	return cfg

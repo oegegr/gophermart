@@ -15,23 +15,24 @@ var (
 )
 
 type UserService interface {
-	CreateUser(ctx context.Context, user api.User) error
-	LoginUser(ctx context.Context, user api.User) error
+	CreateUser(ctx context.Context, user api.User) (string, error)
+	LoginUser(ctx context.Context, user api.User) (string, error)
 }
 
-func NewUserServiceImpl(s storage.Storage, hashProvider HashProvider) (*UserServiceImpl, error) {
-	return &UserServiceImpl{storage: s, hashProvider: hashProvider}, nil
+func NewUserServiceImpl(s storage.Storage, hashProvider HashProvider, jwt JWTParser) (*UserServiceImpl, error) {
+	return &UserServiceImpl{storage: s, hashProvider: hashProvider, jwt: jwt}, nil
 }
 
 type UserServiceImpl struct {
 	storage      storage.Storage
 	hashProvider HashProvider
+	jwt          JWTParser
 }
 
-func (s *UserServiceImpl) CreateUser(ctx context.Context, user api.User) error {
+func (s *UserServiceImpl) CreateUser(ctx context.Context, user api.User) (string, error) {
 	hash, err := s.hashProvider.GetHash(user.Password)
 	if err != nil {
-		return fmt.Errorf("Failed to hash password %w", err)
+		return "", fmt.Errorf("failed to hash password %w", err)
 	}
 
 	u := models.User{
@@ -39,18 +40,23 @@ func (s *UserServiceImpl) CreateUser(ctx context.Context, user api.User) error {
 		PasswordHash: hash,
 	}
 
-	return s.storage.CreateUser(ctx, u)
+	err = s.storage.CreateUser(ctx, u)
+	if err != nil {
+		return "", err
+	} 
+
+	return s.jwt.CreateNewJWTToken(u.Login)
 }
 
-func (s *UserServiceImpl) LoginUser(ctx context.Context, user api.User) error {
+func (s *UserServiceImpl) LoginUser(ctx context.Context, user api.User) (string, error) {
 	u, err := s.storage.FindUserByLogin(ctx, user.Login)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if !s.hashProvider.CompareHash(user.Password, u.PasswordHash) {
-		return ErrInvalidCredentials
+		return "", ErrInvalidCredentials
 	}
 
-	return nil
+	return s.jwt.CreateNewJWTToken(u.Login)
 }

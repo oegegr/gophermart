@@ -41,6 +41,13 @@ run-with-db: build-gophermart run-postgresql
 		DATABASE_URI=postgres://admin:admin@172.28.1.1:5432/gophermart?sslmode=disable \
 		bin/gophermart
 
+.PHONY: run-with-db-win
+run-with-db-win: build-gophermart run-postgresql  
+	    BASE_URL=http://127.0.0.1:8080 \
+		SERVER_ADDRESS=127.0.0.1:8080 \
+		DATABASE_URI=postgres://admin:admin@127.0.0.1:5432/gophermart?sslmode=disable \
+		bin/gophermart
+
 .PHONY: run-postgresql
 run-postgresql: 
 	docker rm -f $$(docker ps -q  -f=name=postgres) || true
@@ -48,7 +55,7 @@ run-postgresql:
 	  -e POSTGRES_USER=admin \
 	  -e POSTGRES_PASSWORD=admin \
 	  -e POSTGRES_DB=gophermart \
-	  -p 172.28.1.1:5432:5432 \
+	  -p 127.0.0.1:5432:5432 \
 	  -v postgres-data:/var/lib/postgresql/data \
 	  postgres:latest 
 	sleep 5

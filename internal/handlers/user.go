@@ -8,6 +8,7 @@ import (
 	"github.com/oegegr/gophermart/internal/models/api"
 	"github.com/oegegr/gophermart/internal/services"
 	"github.com/oegegr/gophermart/internal/storage"
+	"github.com/oegegr/gophermart/internal/middleware"
 )
 
 func NewUserHandler(service services.UserService) (*UserHandler, error) {
@@ -32,8 +33,8 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Login and password are required", http.StatusBadRequest)
 		return
 	}
-
-	if err := h.userService.CreateUser(r.Context(), user); err != nil {
+    token, err := h.userService.CreateUser(r.Context(), user)
+	if err != nil {
 		if err.Error() == "user already exists" {
 			http.Error(w, "User already exists", http.StatusConflict)
 			return
@@ -42,6 +43,8 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	middleware.SetAuthCookie(w, token)
+	middleware.SetAuthorizationHeader(w, token)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -57,8 +60,8 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Login and password are required", http.StatusBadRequest)
 		return
 	}
-
-	if err := h.userService.LoginUser(r.Context(), user); err != nil {
+    token, err := h.userService.LoginUser(r.Context(), user)
+	if  err != nil {
 		if errors.Is(err, storage.ErrStorageUserNotFound) {
 			http.Error(w, "User not found", http.StatusUnauthorized)
 			return
@@ -71,5 +74,7 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	middleware.SetAuthCookie(w, token)
+	middleware.SetAuthorizationHeader(w, token)
 	w.WriteHeader(http.StatusOK)
 }

@@ -33,8 +33,9 @@ func NewApplication(cfg *config.Config) (*Application, error) {
 	}
 
 	hashProvider := services.NewBcryptHashProvider()
+	jwt := services.NewJWTParser(cfg.JWTSecret)
 
-	userService, err := services.NewUserServiceImpl(s, hashProvider)
+	userService, err := services.NewUserServiceImpl(s, hashProvider, jwt)
 	if err != nil {
 		return nil, err
 	}
