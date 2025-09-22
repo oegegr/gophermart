@@ -13,6 +13,7 @@ import (
 	"github.com/oegegr/gophermart/internal/handlers"
 	"github.com/oegegr/gophermart/internal/services"
 	"github.com/oegegr/gophermart/internal/storage"
+	"github.com/oegegr/gophermart/internal/middleware"
 )
 
 type Application struct {
@@ -35,17 +36,31 @@ func NewApplication(cfg *config.Config) (*Application, error) {
 	hashProvider := services.NewBcryptHashProvider()
 	jwt := services.NewJWTParser(cfg.JWTSecret)
 
-	userService, err := services.NewUserServiceImpl(s, hashProvider, jwt)
+	userService, err := services.NewUserServiceImpl(s, hashProvider)
 	if err != nil {
 		return nil, err
 	}
 
-	userHandler, err := handlers.NewUserHandler(userService)
+	userHandler, err := handlers.NewUserHandler(userService, jwt)
 	if err != nil {
 		return nil, err
 	}
 
-	router := NewRouter(userHandler)
+	userLoginProvider := &middleware.AuthContextUserIDPovider{} 
+
+	orderService := services.NewOrderServiceImpl(s)
+	if err != nil {
+		return nil, err
+	}
+
+	orderValidator := &services.LunhOrderValidator{}
+
+	orderHandler, err := handlers.NewOrderHandler(orderService, userLoginProvider, jwt, orderValidator)
+	if err != nil {
+		return nil, err
+	}
+
+	router := NewRouter(userHandler, orderHandler, jwt)
 
 	server := &http.Server{
 		Addr:         cfg.RunAddress,

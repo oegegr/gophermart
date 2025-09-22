@@ -7,10 +7,15 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/oegegr/gophermart/internal/handlers"
+	"github.com/oegegr/gophermart/internal/services"
+	app_middleware "github.com/oegegr/gophermart/internal/middleware"
 )
 
 func NewRouter(
-	userHandler *handlers.UserHandler) http.Handler {
+	userHandler *handlers.UserHandler, 
+	orderHandler *handlers.OrderHandler, 
+	jwt services.JWTParser,
+	) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -19,11 +24,17 @@ func NewRouter(
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
 
-	// Публичные маршруты
 	r.Group(func(r chi.Router) {
 		r.Post("/api/user/register", userHandler.Register)
 		r.Post("/api/user/login", userHandler.Login)
 	})
+
+    r.Group(func(r chi.Router) {
+        r.Use(app_middleware.AuthMiddleware(jwt))
+
+        r.Post("/api/user/orders", orderHandler.UploadOrder)
+        r.Get("/api/user/orders", orderHandler.GetUserOrders)
+    })
 
 	return r
 }

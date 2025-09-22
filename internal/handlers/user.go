@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"context"
 
 	"github.com/oegegr/gophermart/internal/models/api"
 	"github.com/oegegr/gophermart/internal/services"
@@ -11,14 +12,20 @@ import (
 	"github.com/oegegr/gophermart/internal/middleware"
 )
 
-func NewUserHandler(service services.UserService) (*UserHandler, error) {
+type UserLoginProvider interface {
+	Get(ctx context.Context) (string, error)
+}
+
+func NewUserHandler(service services.UserService, jwt services.JWTParser) (*UserHandler, error) {
 	return &UserHandler{
 		userService: service,
+		jwt: jwt,
 	}, nil
 }
 
 type UserHandler struct {
 	userService services.UserService
+	jwt services.JWTParser
 }
 
 func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -33,12 +40,18 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Login and password are required", http.StatusBadRequest)
 		return
 	}
-    token, err := h.userService.CreateUser(r.Context(), user)
+    err := h.userService.CreateUser(r.Context(), user)
 	if err != nil {
 		if err.Error() == "user already exists" {
 			http.Error(w, "User already exists", http.StatusConflict)
 			return
 		}
+		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		return
+	}
+
+	token, err := h.jwt.CreateNewJWTToken(user.Login)
+	if err != nil {
 		http.Error(w, "Failed to create user", http.StatusInternalServerError)
 		return
 	}
@@ -60,7 +73,7 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Login and password are required", http.StatusBadRequest)
 		return
 	}
-    token, err := h.userService.LoginUser(r.Context(), user)
+    err := h.userService.LoginUser(r.Context(), user)
 	if  err != nil {
 		if errors.Is(err, storage.ErrStorageUserNotFound) {
 			http.Error(w, "User not found", http.StatusUnauthorized)
@@ -70,6 +83,12 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Invalid Credentials", http.StatusUnauthorized)
 			return
 		}
+		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		return
+	}
+
+	token, err := h.jwt.CreateNewJWTToken(user.Login)
+	if err != nil {
 		http.Error(w, "Failed to create user", http.StatusInternalServerError)
 		return
 	}

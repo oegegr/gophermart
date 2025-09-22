@@ -55,7 +55,7 @@ run-postgresql:
 	  -e POSTGRES_USER=admin \
 	  -e POSTGRES_PASSWORD=admin \
 	  -e POSTGRES_DB=gophermart \
-	  -p 127.0.0.1:5432:5432 \
+	  -p 172.28.1.1:5432:5432 \
 	  -v postgres-data:/var/lib/postgresql/data \
 	  postgres:latest 
 	sleep 5
