@@ -26,6 +26,8 @@ type Storage interface {
 	UpdateOrderStatus(ctx context.Context, status string, number string, accrual float32) error
 	UpdateUserBalance(ctx context.Context, login string, accrual float32) error
 	GetUserBalance(ctx context.Context, login string) (*models.Balance, error)
+	WithdrawUserBalance(ctx context.Context, withdraw models.Withdraw) error
+	GetUserWithdrawals(ctx context.Context, login string) (*[]models.Withdraw, error)
 }
 
 func NewPGStorage(dbConn *sql.DB) (*PGStorage, error) {
@@ -89,6 +91,7 @@ func (s *PGStorage) CreateOrder(ctx context.Context, order models.Order) error {
 	if err != nil {
 		return err
 	}
+
 	stmt, err := tx.Prepare("INSERT INTO orders (order_number, accrual, status, uploaded_at, user_id) SELECT $1, $2, $3, $4, u.id FROM users u WHERE u.login = $5")
 	if err != nil {
 		log.Printf("sql request validation error: %v", err)
@@ -238,4 +241,89 @@ func (s *PGStorage) GetUserBalance(ctx context.Context, login string) (*models.B
 		return nil, err
 	}
 	return &balance, nil
+}
+
+func (s *PGStorage) WithdrawUserBalance(ctx context.Context, withdraw models.Withdraw) error {
+	tx, err := s.db.Begin()
+    if err != nil {
+        return fmt.Errorf("failed to start transaction: %w", err)
+    }
+
+    defer tx.Rollback()
+
+    updateBalance, err := tx.Prepare("UPDATE users SET balance = $1 WHERE login = $2")
+	if err != nil {
+		log.Printf("sql request validation error: %v", err)
+		return err
+	}
+	defer updateBalance.Close()
+
+	insertWithdraw, err := tx.Prepare("INSERT INTO withdrawals (order_number, withdraw, processed_at, user_id) SELECT $1, $2, $3, u.id FROM users u WHERE u.login = $4")
+	if err != nil {
+		log.Printf("sql request validation error: %v", err)
+		return err
+	}
+	defer insertWithdraw.Close()
+
+    userBalance, err := s.GetUserBalance(ctx, withdraw.Login)
+    if err != nil {
+        return fmt.Errorf("failed to get user balance: %w", err)
+    }
+
+    if userBalance.Current < withdraw.Sum {
+        return errors.New("insufficient balance")
+    }
+
+    newBalance := userBalance.Current - withdraw.Sum
+
+    _, err = updateBalance.ExecContext(ctx, newBalance, withdraw.Login)
+    if err != nil {
+        return fmt.Errorf("failed to update user balance: %w", err)
+    }
+
+    _, err = insertWithdraw.ExecContext(ctx, withdraw.Order, withdraw.Sum, withdraw.ProcessedAt, withdraw.Login)
+    if err != nil {
+        return fmt.Errorf("failed to insert withdrawal record: %w", err)
+    }
+
+    err = tx.Commit()
+    if err != nil {
+        return fmt.Errorf("failed to commit transaction: %w", err)
+    }
+
+    return nil
+}
+
+func (s *PGStorage) GetUserWithdrawals(ctx context.Context, login string) (*[]models.Withdraw, error) {
+	stmt, err := s.db.Prepare("SELECT order_number, withdraw, processed_at FROM withdrawals JOIN  users ON withdrawals.user_id = users.id WHERE login = $1")
+	if err != nil {
+		log.Printf("sql validation error: %v", err)
+		return nil, err
+	}
+	defer stmt.Close()
+
+	var withdrawals []models.Withdraw
+	rows, err := stmt.Query(login)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("user %s withdrawals not found", login)
+			return nil, ErrStorageOrdersNotFound 
+		}
+		log.Printf("sql execution error: %v", err)
+		return nil, err
+	}
+
+	for rows.Next() {
+		var withdraw models.Withdraw
+		rows.Scan(&withdraw.Order, &withdraw.Sum, &withdraw.ProcessedAt)
+		withdraw.Login = login
+		withdrawals = append(withdrawals, withdraw)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row deserialization error %w", err)
+	}
+
+	return &withdrawals, nil
 }

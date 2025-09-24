@@ -34,6 +34,13 @@ type Balance struct {
 	Withdraw float32
 }
 
+type Withdraw struct {
+	Order string
+	Sum   float32
+	ProcessedAt time.Time
+	Login string
+}
+
 var statusMap =  map[string]api.OrderStatus{
     "INVALID":   api.INVALID,
     "PROCESSED": api.PROCESSED,

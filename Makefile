@@ -55,7 +55,7 @@ run-accrual:
 .PHONY: run-postgresql
 run-postgresql: 
 	docker rm -f $$(docker ps -q  -f=name=postgres) || true
-	docker volume rm postgres-data || true
+# 	docker volume rm postgres-data || true
 	docker run -d --name postgres \
 	  -e POSTGRES_USER=admin \
 	  -e POSTGRES_PASSWORD=admin \

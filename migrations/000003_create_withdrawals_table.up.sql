@@ -6,7 +6,7 @@ CREATE TABLE withdrawals (
     user_id INT NOT NULL,
     withdraw REAL,
     order_number VARCHAR(255),
-    uploaded_at TIMESTAMP,
+    processed_at TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
