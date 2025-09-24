@@ -31,7 +31,7 @@ func (s *OrderServiceImpl) UploadOrder(ctx context.Context, login string, orderN
 		Number:     orderNumber,
 		Login:      login,
 		Accrual:    accrual,
-		Status:     string(api.REGISTERED),
+		Status:     string(api.NEW),
 		UploadedAt: uploadedAt,
 	}
 

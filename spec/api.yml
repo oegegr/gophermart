@@ -183,7 +183,7 @@ components:
           type: string
         status:
           type: string
-          enum: [REGISTERED, INVALID, PROCESSING, PROCESSED]
+          enum: [NEW, INVALID, PROCESSING, PROCESSED]
         accrual:
           type: number
         uploaded_at:

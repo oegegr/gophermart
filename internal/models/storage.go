@@ -45,5 +45,5 @@ var statusMap = map[string]api.OrderStatus{
 	"INVALID":    api.INVALID,
 	"PROCESSED":  api.PROCESSED,
 	"PROCESSING": api.PROCESSING,
-	"REGISTERED": api.REGISTERED,
+	"NEW": api.NEW,
 }

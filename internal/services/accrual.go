@@ -64,7 +64,7 @@ func (a *AccrualProcessor) Start(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				orders, err := a.storage.FindOrdersByStatus(ctx, string(api.REGISTERED))
+				orders, err := a.storage.FindOrdersByStatus(ctx, string(api.NEW))
 				if err != nil {
 					log.Printf("Error finding orders: %v", err)
 					continue

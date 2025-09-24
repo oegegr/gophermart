@@ -14,9 +14,9 @@ const (
 // Defines values for OrderStatus.
 const (
 	INVALID    OrderStatus = "INVALID"
+	NEW        OrderStatus = "NEW"
 	PROCESSED  OrderStatus = "PROCESSED"
 	PROCESSING OrderStatus = "PROCESSING"
-	REGISTERED OrderStatus = "REGISTERED"
 )
 
 // Balance defines model for Balance.
