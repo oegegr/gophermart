@@ -15,6 +15,8 @@ var (
 	ErrStorageUserAlreadyExists = errors.New("user already exists")
 	ErrStorageUserNotFound      = errors.New("user not found")
 	ErrStorageOrdersNotFound      = errors.New("orders not found")
+	ErrStorageOrderAlreadyUploadedByUser = errors.New("order already uploaded by user")
+    ErrStorageOrderAlreadyUploadedByOtherUser = errors.New("order already uploaded by other user")
 )
 
 type Storage interface {
@@ -87,30 +89,48 @@ func (s *PGStorage) FindUserByLogin(ctx context.Context, login string) (*models.
 }
 
 func (s *PGStorage) CreateOrder(ctx context.Context, order models.Order) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
+    tx, err := s.db.Begin()
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback()
 
-	stmt, err := tx.Prepare("INSERT INTO orders (order_number, accrual, status, uploaded_at, user_id) SELECT $1, $2, $3, $4, u.id FROM users u WHERE u.login = $5")
-	if err != nil {
-		log.Printf("sql request validation error: %v", err)
-		return err
-	}
-	defer stmt.Close()
+    var exists bool
+    err = tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM orders WHERE order_number = $1 AND user_id = (SELECT id FROM users WHERE login = $2))", order.Number, order.Login).Scan(&exists)
+    if err != nil {
+        log.Printf("sql request execution error: %v", err)
+        return err
+    }
+    if exists {
+        return ErrStorageOrderAlreadyUploadedByUser
+    }
 
-	_, err = stmt.Exec(order.Number, order.Accrual, order.Status, order.UploadedAt, order.Login)
+    err = tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM orders WHERE order_number = $1)", order.Number).Scan(&exists)
+    if err != nil {
+        log.Printf("sql request execution error: %v", err)
+        return err
+    }
+    if exists {
+        return ErrStorageOrderAlreadyUploadedByOtherUser
+    }
 
-	if err != nil {
-		if strings.Contains(err.Error(), "23505") {
-			return ErrStorageUserAlreadyExists
-		}
+    stmt, err := tx.Prepare("INSERT INTO orders (order_number, accrual, status, uploaded_at, user_id) SELECT $1, $2, $3, $4, u.id FROM users u WHERE u.login = $5")
+    if err != nil {
+        log.Printf("sql request validation error: %v", err)
+        return err
+    }
+    defer stmt.Close()
 
-		log.Printf("sql request execution error: %v", err)
-		err := tx.Rollback()
-		return err
-	}
-	return tx.Commit()
+    _, err = stmt.Exec(order.Number, order.Accrual, order.Status, order.UploadedAt, order.Login)
+    if err != nil {
+        if strings.Contains(err.Error(), "23505") {
+            return ErrStorageUserAlreadyExists
+        }
+        log.Printf("sql request execution error: %v", err)
+        return err
+    }
+
+    return tx.Commit()
 }
 
 func (s *PGStorage) FindOrdersByUser(ctx context.Context, login string) ([]models.Order, error) {
