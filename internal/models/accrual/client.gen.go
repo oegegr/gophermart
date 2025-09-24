@@ -209,7 +209,9 @@ func (r GetApiOrdersNumberResponse) StatusCode() int {
 
 // GetApiOrdersNumberWithResponse request returning *GetApiOrdersNumberResponse
 func (c *ClientWithResponses) GetApiOrdersNumberWithResponse(ctx context.Context, number string, reqEditors ...RequestEditorFn) (*GetApiOrdersNumberResponse, error) {
-	rsp, err := c.GetApiOrdersNumber(ctx, number, reqEditors...)//nolint:bodyclose
+	//nolint:gocritic
+	rsp, err := c.GetApiOrdersNumber(ctx, number, reqEditors...)
+
 	if err != nil {
 		return nil, err
 	}
