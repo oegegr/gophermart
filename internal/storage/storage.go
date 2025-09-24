@@ -12,11 +12,11 @@ import (
 )
 
 var (
-	ErrStorageUserAlreadyExists = errors.New("user already exists")
-	ErrStorageUserNotFound      = errors.New("user not found")
-	ErrStorageOrdersNotFound      = errors.New("orders not found")
-	ErrStorageOrderAlreadyUploadedByUser = errors.New("order already uploaded by user")
-    ErrStorageOrderAlreadyUploadedByOtherUser = errors.New("order already uploaded by other user")
+	ErrStorageUserAlreadyExists               = errors.New("user already exists")
+	ErrStorageUserNotFound                    = errors.New("user not found")
+	ErrStorageOrdersNotFound                  = errors.New("orders not found")
+	ErrStorageOrderAlreadyUploadedByUser      = errors.New("order already uploaded by user")
+	ErrStorageOrderAlreadyUploadedByOtherUser = errors.New("order already uploaded by other user")
 )
 
 type Storage interface {
@@ -60,7 +60,7 @@ func (s *PGStorage) CreateUser(ctx context.Context, user models.User) error {
 		}
 
 		log.Printf("sql request execution error: %v", err)
-		err := tx.Rollback()
+		rollbackTransaction(tx)
 		return err
 	}
 	return tx.Commit()
@@ -89,48 +89,48 @@ func (s *PGStorage) FindUserByLogin(ctx context.Context, login string) (*models.
 }
 
 func (s *PGStorage) CreateOrder(ctx context.Context, order models.Order) error {
-    tx, err := s.db.Begin()
-    if err != nil {
-        return err
-    }
-    defer tx.Rollback()
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
 
-    var exists bool
-    err = tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM orders WHERE order_number = $1 AND user_id = (SELECT id FROM users WHERE login = $2))", order.Number, order.Login).Scan(&exists)
-    if err != nil {
-        log.Printf("sql request execution error: %v", err)
-        return err
-    }
-    if exists {
-        return ErrStorageOrderAlreadyUploadedByUser
-    }
+	var exists bool
+	err = tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM orders WHERE order_number = $1 AND user_id = (SELECT id FROM users WHERE login = $2))", order.Number, order.Login).Scan(&exists)
+	if err != nil {
+		log.Printf("sql request execution error: %v", err)
+		return err
+	}
+	if exists {
+		return ErrStorageOrderAlreadyUploadedByUser
+	}
 
-    err = tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM orders WHERE order_number = $1)", order.Number).Scan(&exists)
-    if err != nil {
-        log.Printf("sql request execution error: %v", err)
-        return err
-    }
-    if exists {
-        return ErrStorageOrderAlreadyUploadedByOtherUser
-    }
+	err = tx.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM orders WHERE order_number = $1)", order.Number).Scan(&exists)
+	if err != nil {
+		log.Printf("sql request execution error: %v", err)
+		return err
+	}
+	if exists {
+		return ErrStorageOrderAlreadyUploadedByOtherUser
+	}
 
-    stmt, err := tx.Prepare("INSERT INTO orders (order_number, accrual, status, uploaded_at, user_id) SELECT $1, $2, $3, $4, u.id FROM users u WHERE u.login = $5")
-    if err != nil {
-        log.Printf("sql request validation error: %v", err)
-        return err
-    }
-    defer stmt.Close()
+	stmt, err := tx.Prepare("INSERT INTO orders (order_number, accrual, status, uploaded_at, user_id) SELECT $1, $2, $3, $4, u.id FROM users u WHERE u.login = $5")
+	if err != nil {
+		log.Printf("sql request validation error: %v", err)
+		rollbackTransaction(tx)
+		return err
+	}
+	defer stmt.Close()
 
-    _, err = stmt.Exec(order.Number, order.Accrual, order.Status, order.UploadedAt, order.Login)
-    if err != nil {
-        if strings.Contains(err.Error(), "23505") {
-            return ErrStorageUserAlreadyExists
-        }
-        log.Printf("sql request execution error: %v", err)
-        return err
-    }
+	_, err = stmt.Exec(order.Number, order.Accrual, order.Status, order.UploadedAt, order.Login)
+	if err != nil {
+		if strings.Contains(err.Error(), "23505") {
+			return ErrStorageUserAlreadyExists
+		}
+		log.Printf("sql request execution error: %v", err)
+		return err
+	}
 
-    return tx.Commit()
+	return tx.Commit()
 }
 
 func (s *PGStorage) FindOrdersByUser(ctx context.Context, login string) ([]models.Order, error) {
@@ -147,7 +147,7 @@ func (s *PGStorage) FindOrdersByUser(ctx context.Context, login string) ([]model
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Printf("orders not found for user %s", login)
-			return nil, ErrStorageOrdersNotFound 
+			return nil, ErrStorageOrdersNotFound
 		}
 		log.Printf("sql execution error: %v", err)
 		return nil, err
@@ -155,7 +155,9 @@ func (s *PGStorage) FindOrdersByUser(ctx context.Context, login string) ([]model
 
 	for rows.Next() {
 		var order models.Order
-		rows.Scan(&order.Number, &order.Accrual, &order.Status, &order.UploadedAt)
+		if err := rows.Scan(&order.Number, &order.Accrual, &order.Status, &order.UploadedAt); err != nil {
+			return nil, fmt.Errorf("row deserialization error %w", err)
+		}
 		order.Login = login
 		orders = append(orders, order)
 	}
@@ -181,7 +183,7 @@ func (s *PGStorage) FindOrdersByStatus(ctx context.Context, status string) ([]mo
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Printf("orders with status %s not found", status)
-			return nil, ErrStorageOrdersNotFound 
+			return nil, ErrStorageOrdersNotFound
 		}
 		log.Printf("sql execution error: %v", err)
 		return nil, err
@@ -189,7 +191,9 @@ func (s *PGStorage) FindOrdersByStatus(ctx context.Context, status string) ([]mo
 
 	for rows.Next() {
 		var order models.Order
-		rows.Scan(&order.Number, &order.Accrual, &order.Status, &order.UploadedAt, &order.Login)
+		if err := rows.Scan(&order.Number, &order.Accrual, &order.Status, &order.UploadedAt, &order.Login); err != nil {
+			return nil, fmt.Errorf("row deserialization error %w", err)
+		}
 		orders = append(orders, order)
 	}
 
@@ -201,11 +205,10 @@ func (s *PGStorage) FindOrdersByStatus(ctx context.Context, status string) ([]mo
 }
 
 func (s *PGStorage) UpdateOrderStatus(ctx context.Context, status string, number string, accrual float32) error {
-    tx, err := s.db.Begin()
+	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
 
 	stmt, err := tx.PrepareContext(ctx, "UPDATE orders SET status = $1, accrual = $2 WHERE order_number = $3")
 	if err != nil {
@@ -215,6 +218,8 @@ func (s *PGStorage) UpdateOrderStatus(ctx context.Context, status string, number
 
 	_, err = stmt.ExecContext(ctx, status, accrual, number)
 	if err != nil {
+		log.Printf("sql execution error: %v", err)
+		rollbackTransaction(tx)
 		return err
 	}
 
@@ -226,7 +231,6 @@ func (s *PGStorage) UpdateUserBalance(ctx context.Context, login string, accrual
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
 
 	stmt, err := tx.PrepareContext(ctx, "UPDATE users SET balance = balance + $1 WHERE login = $2")
 	if err != nil {
@@ -236,6 +240,8 @@ func (s *PGStorage) UpdateUserBalance(ctx context.Context, login string, accrual
 
 	_, err = stmt.ExecContext(ctx, accrual, login)
 	if err != nil {
+		log.Printf("sql execution error: %v", err)
+		rollbackTransaction(tx)
 		return err
 	}
 
@@ -265,13 +271,13 @@ func (s *PGStorage) GetUserBalance(ctx context.Context, login string) (*models.B
 
 func (s *PGStorage) WithdrawUserBalance(ctx context.Context, withdraw models.Withdraw) error {
 	tx, err := s.db.Begin()
-    if err != nil {
-        return fmt.Errorf("failed to start transaction: %w", err)
-    }
+	if err != nil {
+		return fmt.Errorf("failed to start transaction: %w", err)
+	}
 
-    defer tx.Rollback()
+	defer rollbackTransaction(tx)
 
-    updateBalance, err := tx.Prepare("UPDATE users SET balance = $1 WHERE login = $2")
+	updateBalance, err := tx.Prepare("UPDATE users SET balance = $1 WHERE login = $2")
 	if err != nil {
 		log.Printf("sql request validation error: %v", err)
 		return err
@@ -285,33 +291,33 @@ func (s *PGStorage) WithdrawUserBalance(ctx context.Context, withdraw models.Wit
 	}
 	defer insertWithdraw.Close()
 
-    userBalance, err := s.GetUserBalance(ctx, withdraw.Login)
-    if err != nil {
-        return fmt.Errorf("failed to get user balance: %w", err)
-    }
+	userBalance, err := s.GetUserBalance(ctx, withdraw.Login)
+	if err != nil {
+		return fmt.Errorf("failed to get user balance: %w", err)
+	}
 
-    if userBalance.Current < withdraw.Sum {
-        return errors.New("insufficient balance")
-    }
+	if userBalance.Current < withdraw.Sum {
+		return errors.New("insufficient balance")
+	}
 
-    newBalance := userBalance.Current - withdraw.Sum
+	newBalance := userBalance.Current - withdraw.Sum
 
-    _, err = updateBalance.ExecContext(ctx, newBalance, withdraw.Login)
-    if err != nil {
-        return fmt.Errorf("failed to update user balance: %w", err)
-    }
+	_, err = updateBalance.ExecContext(ctx, newBalance, withdraw.Login)
+	if err != nil {
+		return fmt.Errorf("failed to update user balance: %w", err)
+	}
 
-    _, err = insertWithdraw.ExecContext(ctx, withdraw.Order, withdraw.Sum, withdraw.ProcessedAt, withdraw.Login)
-    if err != nil {
-        return fmt.Errorf("failed to insert withdrawal record: %w", err)
-    }
+	_, err = insertWithdraw.ExecContext(ctx, withdraw.Order, withdraw.Sum, withdraw.ProcessedAt, withdraw.Login)
+	if err != nil {
+		return fmt.Errorf("failed to insert withdrawal record: %w", err)
+	}
 
-    err = tx.Commit()
-    if err != nil {
-        return fmt.Errorf("failed to commit transaction: %w", err)
-    }
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
 
-    return nil
+	return nil
 }
 
 func (s *PGStorage) GetUserWithdrawals(ctx context.Context, login string) (*[]models.Withdraw, error) {
@@ -328,7 +334,7 @@ func (s *PGStorage) GetUserWithdrawals(ctx context.Context, login string) (*[]mo
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Printf("user %s withdrawals not found", login)
-			return nil, ErrStorageOrdersNotFound 
+			return nil, ErrStorageOrdersNotFound
 		}
 		log.Printf("sql execution error: %v", err)
 		return nil, err
@@ -336,7 +342,9 @@ func (s *PGStorage) GetUserWithdrawals(ctx context.Context, login string) (*[]mo
 
 	for rows.Next() {
 		var withdraw models.Withdraw
-		rows.Scan(&withdraw.Order, &withdraw.Sum, &withdraw.ProcessedAt)
+		if err := rows.Scan(&withdraw.Order, &withdraw.Sum, &withdraw.ProcessedAt); err != nil {
+			return nil, fmt.Errorf("row deserialization error %w", err)
+		}
 		withdraw.Login = login
 		withdrawals = append(withdrawals, withdraw)
 	}
@@ -346,4 +354,11 @@ func (s *PGStorage) GetUserWithdrawals(ctx context.Context, login string) (*[]mo
 	}
 
 	return &withdrawals, nil
+}
+
+func rollbackTransaction(tx *sql.Tx) {
+	err := tx.Rollback()
+	if err != nil {
+		log.Printf("error rolling back transaction: %v", err)
+	}
 }

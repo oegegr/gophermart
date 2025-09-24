@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
-	"github.com/oegegr/gophermart/internal/middleware"
 	"github.com/oegegr/gophermart/internal/services"
 	"github.com/oegegr/gophermart/internal/storage"
 )
@@ -56,11 +56,11 @@ func (h *OrderHandler) UploadOrder(w http.ResponseWriter, r *http.Request) {
 
 	err = h.orderService.UploadOrder(ctx, login, orderNumber)
 	if err != nil {
-		if errors.Is(storage.ErrStorageOrderAlreadyUploadedByOtherUser, err) {
+		if errors.Is(err, storage.ErrStorageOrderAlreadyUploadedByOtherUser) {
 			http.Error(w, "User already exists", http.StatusConflict)
 			return
 		}
-		if errors.Is(storage.ErrStorageOrderAlreadyUploadedByUser, err) {
+		if errors.Is(err, storage.ErrStorageOrderAlreadyUploadedByUser) {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
@@ -68,10 +68,6 @@ func (h *OrderHandler) UploadOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.jwt.CreateNewJWTToken(login)
-
-	middleware.SetAuthCookie(w, token)
-	middleware.SetAuthorizationHeader(w, token)
 	w.WriteHeader(http.StatusAccepted)
 }
 
@@ -94,14 +90,14 @@ func (h *OrderHandler) GetUserOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := h.jwt.CreateNewJWTToken(login)
-
-	middleware.SetAuthCookie(w, token)
-	middleware.SetAuthorizationHeader(w, token)
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(orders)
+
+	if err := json.NewEncoder(w).Encode(orders); err != nil {
+		log.Printf("error encoding orders: %v", err)
+		http.Error(w, "Failed to get orders", http.StatusInternalServerError)
+		return
+	}
 
 }
 

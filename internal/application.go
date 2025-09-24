@@ -64,7 +64,7 @@ func NewApplication(cfg *config.Config) (*Application, error) {
 
 	withdrawService := services.NewWithdrawServiceImpl(s)
 
-	balanceHandler, err := handlers.NewBalanceHandler(withdrawService, userLoginProvider, jwt, orderValidator)
+	balanceHandler := handlers.NewBalanceHandler(withdrawService, userLoginProvider, jwt, orderValidator)
 
 	router := NewRouter(userHandler, orderHandler, balanceHandler, jwt)
 

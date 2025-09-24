@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
-	"github.com/oegegr/gophermart/internal/middleware"
 	"github.com/oegegr/gophermart/internal/models/api"
 	"github.com/oegegr/gophermart/internal/services"
 )
@@ -14,13 +14,13 @@ func NewBalanceHandler(
 	loginProvider UserLoginProvider,
 	jwt services.JWTParser,
 	validator services.OrderValidator,
-) (*BalanceHandler, error) {
+) *BalanceHandler {
 	return &BalanceHandler{
 		withdrawService: service,
 		loginProvider:   loginProvider,
 		jwt:             jwt,
 		orderValidator:  validator,
-	}, nil
+	}
 }
 
 type BalanceHandler struct {
@@ -49,14 +49,14 @@ func (h *BalanceHandler) GetUserBalance(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	token, err := h.jwt.CreateNewJWTToken(login)
-
-	middleware.SetAuthCookie(w, token)
-	middleware.SetAuthorizationHeader(w, token)
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(balance)
+
+	if err := json.NewEncoder(w).Encode(balance); err != nil {
+		log.Printf("error encoding balance: %v", err)
+		http.Error(w, "Failed to get balance", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *BalanceHandler) WithdrawUserBalance(w http.ResponseWriter, r *http.Request) {
@@ -85,11 +85,6 @@ func (h *BalanceHandler) WithdrawUserBalance(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	token, err := h.jwt.CreateNewJWTToken(login)
-
-	middleware.SetAuthCookie(w, token)
-	middleware.SetAuthorizationHeader(w, token)
-
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -112,12 +107,11 @@ func (h *BalanceHandler) GetUserWithdrawals(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	token, err := h.jwt.CreateNewJWTToken(login)
-
-	middleware.SetAuthCookie(w, token)
-	middleware.SetAuthorizationHeader(w, token)
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(withdrawals)
+	if err := json.NewEncoder(w).Encode(withdrawals); err != nil {
+		log.Printf("error encoding withdrawals: %v", err)
+		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		return
+	}
 }

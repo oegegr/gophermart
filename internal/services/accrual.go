@@ -70,7 +70,11 @@ func (a *AccrualProcessor) Start(ctx context.Context) {
 					continue
 				}
 				for _, o := range orders {
-					a.storage.UpdateOrderStatus(ctx, string(api.PROCESSING), o.Number, 0.0)
+					err := a.storage.UpdateOrderStatus(ctx, string(api.PROCESSING), o.Number, 0.0)
+					if err != nil {
+						log.Printf("failed to update order %s status: %v", o.Number, err)
+						continue
+					}
 					task := processOrderTask{ctx, o}
 					select {
 					case a.orderQueue <- task:
