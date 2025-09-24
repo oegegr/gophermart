@@ -19,7 +19,7 @@ type Order struct {
 	Login      string
 }
 
-func (o *Order) ToApi(order Order) api.Order {
+func (o *Order) ToAPI(order Order) api.Order {
 	status := statusMap[order.Status]
 	return api.Order{
 		Number:     &order.Number,

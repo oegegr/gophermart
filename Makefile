@@ -55,7 +55,7 @@ run-accrual:
 .PHONY: run-postgresql
 run-postgresql: 
 	docker rm -f $$(docker ps -q  -f=name=postgres) || true
-# 	docker volume rm postgres-data || true
+ 	docker volume rm postgres-data || true
 	docker run -d --name postgres \
 	  -e POSTGRES_USER=admin \
 	  -e POSTGRES_PASSWORD=admin \
@@ -65,7 +65,6 @@ run-postgresql:
 	  postgres:latest 
 	sleep 5
 
-# Генерация кода для основного API
 generate-api:
 	oapi-codegen \
 		-generate types \
@@ -73,7 +72,6 @@ generate-api:
 		-o $(GEN_DIR)/$(API_PKG)/types.gen.go \
 		$(SPEC_DIR)/api.yml
 
-# Генерация кода для API начислений
 generate-accrual:
 	oapi-codegen \
 		-generate types \
@@ -87,13 +85,10 @@ generate-accrual:
 		-o $(GEN_DIR)/$(ACCRUAL_PKG)/client.gen.go \
 		$(SPEC_DIR)/accrual.yml
 
-# Генерация всего кода
 generate: generate-api generate-accrual
 
-# Проверка установки oapi-codegen
 check-tools:
 	@which oapi-codegen || (echo "oapi-codegen not found. Run 'make install-tools' first." && exit 1)
 
-# Очистка сгенерированных файлов
 clean:
 	rm -rf $(GEN_DIR)/*

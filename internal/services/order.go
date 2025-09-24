@@ -46,7 +46,7 @@ func (s *OrderServiceImpl) GetUserOrders(ctx context.Context, login string) ([]a
 
 	var apiOrders []api.Order
 	for _, o := range orders {
-		apiOrders = append(apiOrders, o.ToApi(o))
+		apiOrders = append(apiOrders, o.ToAPI(o))
 	}
 	return apiOrders, nil
 }

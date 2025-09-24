@@ -51,9 +51,6 @@ func NewApplication(cfg *config.Config) (*Application, error) {
 	userLoginProvider := &middleware.AuthContextUserIDPovider{}
 
 	orderService := services.NewOrderServiceImpl(s)
-	if err != nil {
-		return nil, err
-	}
 
 	orderValidator := &services.LunhOrderValidator{}
 

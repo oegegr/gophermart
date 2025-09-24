@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	ErrInvalidCredentials = errors.New("Invalid Credentials")
+	ErrInvalidCredentials = errors.New("invalid Credentials")
 )
 
 type UserService interface {
