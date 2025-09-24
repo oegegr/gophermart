@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/oegegr/gophermart/internal/middleware"
 	"github.com/oegegr/gophermart/internal/services"
+	"github.com/oegegr/gophermart/internal/storage"
 )
 
 func NewOrderHandler(
@@ -54,8 +56,12 @@ func (h *OrderHandler) UploadOrder(w http.ResponseWriter, r *http.Request) {
 
 	err = h.orderService.UploadOrder(ctx, login, orderNumber)
 	if err != nil {
-		if err.Error() == "user already exists" {
+		if errors.Is(storage.ErrStorageOrderAlreadyUploadedByOtherUser, err) {
 			http.Error(w, "User already exists", http.StatusConflict)
+			return
+		}
+		if errors.Is(storage.ErrStorageOrderAlreadyUploadedByUser, err) {
+			w.WriteHeader(http.StatusOK)
 			return
 		}
 		http.Error(w, "Failed to create user", http.StatusInternalServerError)
