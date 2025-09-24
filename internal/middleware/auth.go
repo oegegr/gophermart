@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
-	"log"
 
 	"github.com/oegegr/gophermart/internal/services"
 )
@@ -14,24 +14,24 @@ import (
 type contextKey string
 
 const (
-	userIDKey  contextKey = "userID"
-	cookieName string     = "auth"
-	authorizationHeader string = "Authrorization"
+	userIDKey           contextKey = "userID"
+	cookieName          string     = "auth"
+	authorizationHeader string     = "Authrorization"
 )
 
-type AuthContextUserIDPovider struct {}
+type AuthContextUserIDPovider struct{}
 
 func (a *AuthContextUserIDPovider) Get(ctx context.Context) (string, error) {
-	value := ctx.Value(userIDKey) 
+	value := ctx.Value(userIDKey)
 	if value == nil {
 		return "", fmt.Errorf("failed to get userID from context")
 	}
 
 	userID, ok := value.(string)
 	if !ok {
-		return "", fmt.Errorf("failed to convert userID to string") 
+		return "", fmt.Errorf("failed to convert userID to string")
 	}
-	return userID, nil 
+	return userID, nil
 }
 
 func AuthMiddleware(jwt services.JWTParser) func(http.Handler) http.Handler {
@@ -118,4 +118,3 @@ func tryCookies(r *http.Request, v services.JWTParser) (string, error) {
 
 	return "", err
 }
-

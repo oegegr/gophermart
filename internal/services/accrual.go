@@ -14,37 +14,34 @@ import (
 	"github.com/oegegr/gophermart/internal/storage"
 )
 
-
 func NewAccrualProcessor(
-	client *accrual.ClientWithResponses, 
-	storage storage.Storage, 
+	client *accrual.ClientWithResponses,
+	storage storage.Storage,
 	timeout time.Duration,
 	workerNum int,
 	workerTask int,
-	) *AccrualProcessor {
+) *AccrualProcessor {
 	return &AccrualProcessor{
-		client:  client,
-		storage: storage,
-		timeout: timeout,
-		workerNum: workerNum,
+		client:     client,
+		storage:    storage,
+		timeout:    timeout,
+		workerNum:  workerNum,
 		orderQueue: make(chan processOrderTask, workerTask),
 	}
 }
 
 type processOrderTask struct {
-	ctx      context.Context
-	order    models.Order
+	ctx   context.Context
+	order models.Order
 }
 
 type AccrualProcessor struct {
-	client  *accrual.ClientWithResponses
-	storage storage.Storage
-	timeout time.Duration
-	workerNum     int
-	orderQueue   chan processOrderTask 
+	client     *accrual.ClientWithResponses
+	storage    storage.Storage
+	timeout    time.Duration
+	workerNum  int
+	orderQueue chan processOrderTask
 }
-
-
 
 func (a *AccrualProcessor) Start(ctx context.Context) {
 	var wg sync.WaitGroup
@@ -57,7 +54,6 @@ func (a *AccrualProcessor) Start(ctx context.Context) {
 		}(i + 1)
 	}
 
-
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -68,21 +64,21 @@ func (a *AccrualProcessor) Start(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-                orders, err := a.storage.FindOrdersByStatus(ctx, string(api.REGISTERED))
-                if err != nil {
-                    log.Printf("Error finding orders: %v", err)
-                    continue
-                }
-                for _, o := range orders {
+				orders, err := a.storage.FindOrdersByStatus(ctx, string(api.REGISTERED))
+				if err != nil {
+					log.Printf("Error finding orders: %v", err)
+					continue
+				}
+				for _, o := range orders {
 					a.storage.UpdateOrderStatus(ctx, string(api.PROCESSING), o.Number, 0.0)
 					task := processOrderTask{ctx, o}
 					select {
-                    case a.orderQueue <- task:
+					case a.orderQueue <- task:
 					case <-ctx.Done():
 						return
 					}
-                }
-            }
+				}
+			}
 		}
 	}()
 
@@ -92,7 +88,7 @@ func (a *AccrualProcessor) Start(ctx context.Context) {
 func (a *AccrualProcessor) processOrders(ctx context.Context) {
 	for {
 		select {
-		case orderTask, ok := <- a.orderQueue:
+		case orderTask, ok := <-a.orderQueue:
 			if !ok {
 				return
 			}

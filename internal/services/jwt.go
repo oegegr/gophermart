@@ -18,7 +18,7 @@ type JWTParser struct {
 }
 
 func NewJWTParser(jwtSecret string) JWTParser {
-	return JWTParser{jwtSecret} 
+	return JWTParser{jwtSecret}
 }
 
 func (v *JWTParser) CreateNewJWTToken(userID string) (string, error) {

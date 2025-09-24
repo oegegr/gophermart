@@ -48,7 +48,7 @@ func NewApplication(cfg *config.Config) (*Application, error) {
 		return nil, err
 	}
 
-	userLoginProvider := &middleware.AuthContextUserIDPovider{} 
+	userLoginProvider := &middleware.AuthContextUserIDPovider{}
 
 	orderService := services.NewOrderServiceImpl(s)
 	if err != nil {
@@ -77,24 +77,23 @@ func NewApplication(cfg *config.Config) (*Application, error) {
 	}
 
 	accrualClient, err := accrual.NewClientWithResponses(cfg.AccrualSystemAddress)
-	if err!= nil {
+	if err != nil {
 		return nil, err
 	}
 
 	accr := services.NewAccrualProcessor(
-		accrualClient, 
-		s,  
+		accrualClient,
+		s,
 		cfg.AccrualInterval,
 		10,
 		1000,
 	)
 
-
 	return &Application{
 		cfg:    cfg,
 		server: server,
 		dbConn: dbConn,
-		accr: accr,
+		accr:   accr,
 	}, nil
 }
 
@@ -111,7 +110,6 @@ func (app *Application) Start(ctx context.Context) error {
 			log.Printf("HTTP server error: %v", err)
 		}
 	}()
-
 
 	go func() {
 		defer wg.Done()

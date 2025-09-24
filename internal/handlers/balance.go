@@ -10,36 +10,36 @@ import (
 )
 
 func NewBalanceHandler(
-	service services.WithdrawService, 
+	service services.WithdrawService,
 	loginProvider UserLoginProvider,
 	jwt services.JWTParser,
 	validator services.OrderValidator,
-	) (*BalanceHandler, error) {
+) (*BalanceHandler, error) {
 	return &BalanceHandler{
 		withdrawService: service,
-		loginProvider: loginProvider,
-		jwt: jwt,
-		orderValidator: validator,
+		loginProvider:   loginProvider,
+		jwt:             jwt,
+		orderValidator:  validator,
 	}, nil
 }
 
 type BalanceHandler struct {
 	withdrawService services.WithdrawService
-	loginProvider UserLoginProvider
-	jwt          services.JWTParser
-	orderValidator services.OrderValidator
+	loginProvider   UserLoginProvider
+	jwt             services.JWTParser
+	orderValidator  services.OrderValidator
 }
 
 func (h *BalanceHandler) GetUserBalance(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	login, err := h.loginProvider.Get(ctx) 
+	login, err := h.loginProvider.Get(ctx)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
-    balance, err := h.withdrawService.GetUserBalance(ctx, login)
+	balance, err := h.withdrawService.GetUserBalance(ctx, login)
 	if err != nil {
 		if err.Error() == "user already exists" {
 			http.Error(w, "User already exists", http.StatusConflict)
@@ -62,7 +62,7 @@ func (h *BalanceHandler) GetUserBalance(w http.ResponseWriter, r *http.Request) 
 func (h *BalanceHandler) WithdrawUserBalance(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	login, err := h.loginProvider.Get(ctx) 
+	login, err := h.loginProvider.Get(ctx)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -75,7 +75,7 @@ func (h *BalanceHandler) WithdrawUserBalance(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-    err = h.withdrawService.WithdrawBalance(ctx, login, withdrawRequest)
+	err = h.withdrawService.WithdrawBalance(ctx, login, withdrawRequest)
 	if err != nil {
 		if err.Error() == "user already exists" {
 			http.Error(w, "User already exists", http.StatusConflict)
@@ -96,13 +96,13 @@ func (h *BalanceHandler) WithdrawUserBalance(w http.ResponseWriter, r *http.Requ
 func (h *BalanceHandler) GetUserWithdrawals(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	login, err := h.loginProvider.Get(ctx) 
+	login, err := h.loginProvider.Get(ctx)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
-    withdrawals, err := h.withdrawService.GetUserWithdrawals(ctx, login)
+	withdrawals, err := h.withdrawService.GetUserWithdrawals(ctx, login)
 	if err != nil {
 		if err.Error() == "user already exists" {
 			http.Error(w, "User already exists", http.StatusConflict)

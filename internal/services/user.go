@@ -42,7 +42,7 @@ func (s *UserServiceImpl) CreateUser(ctx context.Context, user api.User) error {
 	err = s.storage.CreateUser(ctx, u)
 	if err != nil {
 		return err
-	} 
+	}
 	return nil
 }
 

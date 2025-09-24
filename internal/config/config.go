@@ -11,7 +11,7 @@ type Config struct {
 	DatabaseURI          string
 	JWTSecret            string
 	AccrualSystemAddress string
-	AccrualInterval      time.Duration 
+	AccrualInterval      time.Duration
 }
 
 func LoadConfig() *Config {

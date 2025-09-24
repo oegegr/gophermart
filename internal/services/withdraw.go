@@ -12,9 +12,9 @@ import (
 )
 
 type WithdrawService interface {
-	GetUserBalance(ctx context.Context, login string) (*api.Balance, error) 
+	GetUserBalance(ctx context.Context, login string) (*api.Balance, error)
 	WithdrawBalance(ctx context.Context, login string, withdrawalRequest api.WithdrawalRequest) error
-	GetUserWithdrawals(ctx context.Context, login string) (*[]api.Withdrawal, error) 
+	GetUserWithdrawals(ctx context.Context, login string) (*[]api.Withdrawal, error)
 }
 
 func NewWithdrawServiceImpl(storage storage.Storage) *WithdrawServiceImpl {
@@ -26,7 +26,6 @@ func NewWithdrawServiceImpl(storage storage.Storage) *WithdrawServiceImpl {
 type WithdrawServiceImpl struct {
 	storage storage.Storage
 }
-
 
 func (s *WithdrawServiceImpl) GetUserBalance(ctx context.Context, login string) (*api.Balance, error) {
 	b, err := s.storage.GetUserBalance(ctx, login)
@@ -56,10 +55,10 @@ func (s *WithdrawServiceImpl) GetUserWithdrawals(ctx context.Context, login stri
 		return nil, fmt.Errorf("failed to get user %s withdrawals %v", login, err)
 	}
 
-	var apiWithdrawals []api.Withdrawal  
+	var apiWithdrawals []api.Withdrawal
 	for _, w := range *withdrawals {
 		apiWithdrawals = append(apiWithdrawals, api.Withdrawal{Order: &w.Order, ProcessedAt: &w.ProcessedAt, Sum: &w.Sum})
 	}
 
-	return &apiWithdrawals, nil 
+	return &apiWithdrawals, nil
 }

@@ -2,39 +2,39 @@ package handlers
 
 import (
 	"encoding/json"
-	"net/http"
 	"io"
+	"net/http"
 	"strings"
 
-	"github.com/oegegr/gophermart/internal/services"
 	"github.com/oegegr/gophermart/internal/middleware"
+	"github.com/oegegr/gophermart/internal/services"
 )
 
 func NewOrderHandler(
-	service services.OrderService, 
+	service services.OrderService,
 	loginProvider UserLoginProvider,
 	jwt services.JWTParser,
 	validator services.OrderValidator,
-	) (*OrderHandler, error) {
+) (*OrderHandler, error) {
 	return &OrderHandler{
-		orderService: service,
-		loginProvider: loginProvider,
-		jwt: jwt,
+		orderService:   service,
+		loginProvider:  loginProvider,
+		jwt:            jwt,
 		orderValidator: validator,
 	}, nil
 }
 
 type OrderHandler struct {
-	orderService services.OrderService
-	loginProvider UserLoginProvider
-	jwt          services.JWTParser
+	orderService   services.OrderService
+	loginProvider  UserLoginProvider
+	jwt            services.JWTParser
 	orderValidator services.OrderValidator
 }
 
 func (h *OrderHandler) UploadOrder(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	login, err := h.loginProvider.Get(ctx) 
+	login, err := h.loginProvider.Get(ctx)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
@@ -42,17 +42,17 @@ func (h *OrderHandler) UploadOrder(w http.ResponseWriter, r *http.Request) {
 
 	orderNumber, err := parseOrderNumber(r)
 	if err != nil {
-        http.Error(w, "Invalid order number: parsing failed", http.StatusBadRequest)
+		http.Error(w, "Invalid order number: parsing failed", http.StatusUnprocessableEntity)
 		return
 	}
 
 	ok := h.orderValidator.Validate(orderNumber)
 	if !ok {
-        http.Error(w, "Invalid order number: validation failed", http.StatusBadRequest)
-        return
+		http.Error(w, "Invalid order number: validation failed", http.StatusUnprocessableEntity)
+		return
 	}
 
-    err = h.orderService.UploadOrder(ctx, login, orderNumber)
+	err = h.orderService.UploadOrder(ctx, login, orderNumber)
 	if err != nil {
 		if err.Error() == "user already exists" {
 			http.Error(w, "User already exists", http.StatusConflict)
@@ -66,19 +66,19 @@ func (h *OrderHandler) UploadOrder(w http.ResponseWriter, r *http.Request) {
 
 	middleware.SetAuthCookie(w, token)
 	middleware.SetAuthorizationHeader(w, token)
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (h *OrderHandler) GetUserOrders(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	login, err := h.loginProvider.Get(ctx) 
+	login, err := h.loginProvider.Get(ctx)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
 
-    orders, err := h.orderService.GetUserOrders(ctx, login)
+	orders, err := h.orderService.GetUserOrders(ctx, login)
 	if err != nil {
 		if err.Error() == "user already exists" {
 			http.Error(w, "User already exists", http.StatusConflict)
@@ -99,12 +99,11 @@ func (h *OrderHandler) GetUserOrders(w http.ResponseWriter, r *http.Request) {
 
 }
 
-
 func parseOrderNumber(r *http.Request) (string, error) {
 	body := make([]byte, r.ContentLength)
-    if _, err := r.Body.Read(body); err != nil && err != io.EOF {
-        return "", err
-    }
-    return strings.TrimSpace(string(body)), nil
+	if _, err := r.Body.Read(body); err != nil && err != io.EOF {
+		return "", err
+	}
+	return strings.TrimSpace(string(body)), nil
 
 }

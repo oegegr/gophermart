@@ -28,10 +28,10 @@ func (s *OrderServiceImpl) UploadOrder(ctx context.Context, login string, orderN
 	accrual := float32(0.0)
 	uploadedAt := time.Now()
 	order := models.Order{
-		Number: orderNumber,
-		Login: login,
-		Accrual: accrual,
-		Status: string(api.REGISTERED),
+		Number:     orderNumber,
+		Login:      login,
+		Accrual:    accrual,
+		Status:     string(api.REGISTERED),
 		UploadedAt: uploadedAt,
 	}
 
@@ -47,6 +47,6 @@ func (s *OrderServiceImpl) GetUserOrders(ctx context.Context, login string) ([]a
 	var apiOrders []api.Order
 	for _, o := range orders {
 		apiOrders = append(apiOrders, o.ToApi(o))
-	} 
+	}
 	return apiOrders, nil
 }

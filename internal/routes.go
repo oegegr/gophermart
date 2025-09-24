@@ -7,16 +7,16 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/oegegr/gophermart/internal/handlers"
-	"github.com/oegegr/gophermart/internal/services"
 	app_middleware "github.com/oegegr/gophermart/internal/middleware"
+	"github.com/oegegr/gophermart/internal/services"
 )
 
 func NewRouter(
-	userHandler *handlers.UserHandler, 
-	orderHandler *handlers.OrderHandler, 
+	userHandler *handlers.UserHandler,
+	orderHandler *handlers.OrderHandler,
 	balanceHandler *handlers.BalanceHandler,
 	jwt services.JWTParser,
-	) http.Handler {
+) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -30,16 +30,16 @@ func NewRouter(
 		r.Post("/api/user/login", userHandler.Login)
 	})
 
-    r.Group(func(r chi.Router) {
-        r.Use(app_middleware.AuthMiddleware(jwt))
+	r.Group(func(r chi.Router) {
+		r.Use(app_middleware.AuthMiddleware(jwt))
 
-        r.Post("/api/user/orders", orderHandler.UploadOrder)
-        r.Get("/api/user/orders", orderHandler.GetUserOrders)
+		r.Post("/api/user/orders", orderHandler.UploadOrder)
+		r.Get("/api/user/orders", orderHandler.GetUserOrders)
 
-        r.Get("/api/user/balance", balanceHandler.GetUserBalance)
-        r.Post("/api/user/balance/withdraw", balanceHandler.WithdrawUserBalance)
-        r.Get("/api/user/balance/withdrawals", balanceHandler.GetUserWithdrawals)
-    })
+		r.Get("/api/user/balance", balanceHandler.GetUserBalance)
+		r.Post("/api/user/balance/withdraw", balanceHandler.WithdrawUserBalance)
+		r.Get("/api/user/balance/withdrawals", balanceHandler.GetUserWithdrawals)
+	})
 
 	return r
 }

@@ -1,15 +1,15 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
-	"context"
 
+	"github.com/oegegr/gophermart/internal/middleware"
 	"github.com/oegegr/gophermart/internal/models/api"
 	"github.com/oegegr/gophermart/internal/services"
 	"github.com/oegegr/gophermart/internal/storage"
-	"github.com/oegegr/gophermart/internal/middleware"
 )
 
 type UserLoginProvider interface {
@@ -19,13 +19,13 @@ type UserLoginProvider interface {
 func NewUserHandler(service services.UserService, jwt services.JWTParser) (*UserHandler, error) {
 	return &UserHandler{
 		userService: service,
-		jwt: jwt,
+		jwt:         jwt,
 	}, nil
 }
 
 type UserHandler struct {
 	userService services.UserService
-	jwt services.JWTParser
+	jwt         services.JWTParser
 }
 
 func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -40,7 +40,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Login and password are required", http.StatusBadRequest)
 		return
 	}
-    err := h.userService.CreateUser(r.Context(), user)
+	err := h.userService.CreateUser(r.Context(), user)
 	if err != nil {
 		if err.Error() == "user already exists" {
 			http.Error(w, "User already exists", http.StatusConflict)
@@ -73,8 +73,8 @@ func (h *UserHandler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Login and password are required", http.StatusBadRequest)
 		return
 	}
-    err := h.userService.LoginUser(r.Context(), user)
-	if  err != nil {
+	err := h.userService.LoginUser(r.Context(), user)
+	if err != nil {
 		if errors.Is(err, storage.ErrStorageUserNotFound) {
 			http.Error(w, "User not found", http.StatusUnauthorized)
 			return
