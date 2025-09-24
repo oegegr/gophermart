@@ -208,20 +208,12 @@ func (r GetApiOrdersNumberResponse) StatusCode() int {
 }
 
 // GetApiOrdersNumberWithResponse request returning *GetApiOrdersNumberResponse
-//
-//nolint:gocritic,bodyclose
 func (c *ClientWithResponses) GetApiOrdersNumberWithResponse(ctx context.Context, number string, reqEditors ...RequestEditorFn) (*GetApiOrdersNumberResponse, error) {
-	//nolint:gocritic,bodyclose
 	rsp, err := c.GetApiOrdersNumber(ctx, number, reqEditors...)
 
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetApiOrdersNumberResponse(rsp)
-}
-
-// ParseGetApiOrdersNumberResponse parses an HTTP response from a GetApiOrdersNumberWithResponse call
-func ParseGetApiOrdersNumberResponse(rsp *http.Response) (*GetApiOrdersNumberResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
