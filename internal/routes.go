@@ -38,7 +38,7 @@ func NewRouter(
 
 		r.Get("/api/user/balance", balanceHandler.GetUserBalance)
 		r.Post("/api/user/balance/withdraw", balanceHandler.WithdrawUserBalance)
-		r.Get("/api/user/balance/withdrawals", balanceHandler.GetUserWithdrawals)
+		r.Get("/api/user/withdrawals", balanceHandler.GetUserWithdrawals)
 	})
 
 	return r
