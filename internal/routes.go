@@ -14,6 +14,7 @@ import (
 func NewRouter(
 	userHandler *handlers.UserHandler, 
 	orderHandler *handlers.OrderHandler, 
+	balanceHandler *handlers.BalanceHandler,
 	jwt services.JWTParser,
 	) http.Handler {
 	r := chi.NewRouter()
@@ -34,6 +35,8 @@ func NewRouter(
 
         r.Post("/api/user/orders", orderHandler.UploadOrder)
         r.Get("/api/user/orders", orderHandler.GetUserOrders)
+
+        r.Get("/api/user/balance", balanceHandler.GetUserBalance)
     })
 
 	return r

@@ -35,22 +35,27 @@ build-gophermart:
 		go build -o bin ./...
 
 .PHONY: run-with-db
-run-with-db: build-gophermart run-postgresql  
-	    BASE_URL=http://127.0.0.1:8080 \
-		SERVER_ADDRESS=127.0.0.1:8080 \
+run-with-db: build-gophermart run-postgresql run-accrual 
+		RUN_ADDRESS=127.0.0.1:8080 \
+		ACCRUAL_SYSTEM_ADDRESS=http://127.0.0.1:8081/ \
 		DATABASE_URI=postgres://admin:admin@172.28.1.1:5432/gophermart?sslmode=disable \
 		bin/gophermart
 
 .PHONY: run-with-db-win
 run-with-db-win: build-gophermart run-postgresql  
-	    BASE_URL=http://127.0.0.1:8080 \
 		SERVER_ADDRESS=127.0.0.1:8080 \
 		DATABASE_URI=postgres://admin:admin@127.0.0.1:5432/gophermart?sslmode=disable \
 		bin/gophermart
 
+.PHONY: run-accrual
+run-accrual: 
+	pkill accrual || true
+	nohup cmd/accrual/accrual_linux_amd64 -a 127.0.0.1:8081 -d postgres://admin:admin@127.0.0.1:5432/accrual?sslmode=disable &
+
 .PHONY: run-postgresql
 run-postgresql: 
 	docker rm -f $$(docker ps -q  -f=name=postgres) || true
+	docker volume rm postgres-data || true
 	docker run -d --name postgres \
 	  -e POSTGRES_USER=admin \
 	  -e POSTGRES_PASSWORD=admin \
@@ -76,11 +81,11 @@ generate-accrual:
 		-o $(GEN_DIR)/$(ACCRUAL_PKG)/types.gen.go \
 		$(SPEC_DIR)/accrual.yml
 	
-# 	oapi-codegen \
-# 		-generate client \
-# 		-package $(ACCRUAL_PKG) \
-# 		-o $(GEN_DIR)/$(ACCRUAL_PKG)/client.gen.go \
-# 		$(SPEC_DIR)/accrual.yml
+	oapi-codegen \
+		-generate client \
+		-package $(ACCRUAL_PKG) \
+		-o $(GEN_DIR)/$(ACCRUAL_PKG)/client.gen.go \
+		$(SPEC_DIR)/accrual.yml
 
 # Генерация всего кода
 generate: generate-api generate-accrual

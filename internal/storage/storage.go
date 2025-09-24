@@ -22,6 +22,10 @@ type Storage interface {
 	FindUserByLogin(ctx context.Context, login string) (*models.User, error)
 	CreateOrder(ctx context.Context, order models.Order) error
 	FindOrdersByUser(ctx context.Context, login string) ([]models.Order, error)
+	FindOrdersByStatus(ctx context.Context, status string) ([]models.Order, error)
+	UpdateOrderStatus(ctx context.Context, status string, number string, accrual float32) error
+	UpdateUserBalance(ctx context.Context, login string, accrual float32) error
+	GetUserBalance(ctx context.Context, login string) (*models.Balance, error)
 }
 
 func NewPGStorage(dbConn *sql.DB) (*PGStorage, error) {
@@ -138,4 +142,100 @@ func (s *PGStorage) FindOrdersByUser(ctx context.Context, login string) ([]model
 	}
 
 	return orders, nil
+}
+
+func (s *PGStorage) FindOrdersByStatus(ctx context.Context, status string) ([]models.Order, error) {
+	stmt, err := s.db.Prepare("SELECT order_number, accrual, status, uploaded_at, users.login FROM orders JOIN  users ON orders.user_id = users.id WHERE status = $1")
+	if err != nil {
+		log.Printf("sql validation error: %v", err)
+		return nil, err
+	}
+	defer stmt.Close()
+
+	var orders []models.Order
+	rows, err := stmt.Query(status)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("orders with status %s not found", status)
+			return nil, ErrStorageOrdersNotFound 
+		}
+		log.Printf("sql execution error: %v", err)
+		return nil, err
+	}
+
+	for rows.Next() {
+		var order models.Order
+		rows.Scan(&order.Number, &order.Accrual, &order.Status, &order.UploadedAt, &order.Login)
+		orders = append(orders, order)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row deserialization error %w", err)
+	}
+
+	return orders, nil
+}
+
+func (s *PGStorage) UpdateOrderStatus(ctx context.Context, status string, number string, accrual float32) error {
+    tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, "UPDATE orders SET status = $1, accrual = $2 WHERE order_number = $3")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.ExecContext(ctx, status, accrual, number)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *PGStorage) UpdateUserBalance(ctx context.Context, login string, accrual float32) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, "UPDATE users SET balance = balance + $1 WHERE login = $2")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	_, err = stmt.ExecContext(ctx, accrual, login)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *PGStorage) GetUserBalance(ctx context.Context, login string) (*models.Balance, error) {
+	stmt, err := s.db.Prepare("SELECT u.balance, COALESCE(SUM(w.withdraw), 0) AS total_withdrawn FROM users u LEFT JOIN withdrawals w ON w.user_id = u.id WHERE  u.login = $1 GROUP BY u.balance")
+	if err != nil {
+		log.Printf("sql validation error: %v", err)
+		return nil, err
+	}
+	defer stmt.Close()
+
+	var balance models.Balance
+	err = stmt.QueryRow(login).Scan(&balance.Current, &balance.Withdraw)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			log.Printf("balance for user %s not found", login)
+			return nil, ErrStorageUserNotFound
+		}
+		log.Printf("sql execution error: %v", err)
+		return nil, err
+	}
+	return &balance, nil
 }

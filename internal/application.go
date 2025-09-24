@@ -11,14 +11,16 @@ import (
 	"github.com/oegegr/gophermart/internal/config"
 	"github.com/oegegr/gophermart/internal/config/db"
 	"github.com/oegegr/gophermart/internal/handlers"
+	"github.com/oegegr/gophermart/internal/middleware"
+	"github.com/oegegr/gophermart/internal/models/accrual"
 	"github.com/oegegr/gophermart/internal/services"
 	"github.com/oegegr/gophermart/internal/storage"
-	"github.com/oegegr/gophermart/internal/middleware"
 )
 
 type Application struct {
 	cfg    *config.Config
 	server *http.Server
+	accr   *services.AccrualProcessor
 	dbConn *sql.DB
 }
 
@@ -60,7 +62,11 @@ func NewApplication(cfg *config.Config) (*Application, error) {
 		return nil, err
 	}
 
-	router := NewRouter(userHandler, orderHandler, jwt)
+	withdrawService := services.NewWithdrawServiceImpl(s)
+
+	balanceHandler, err := handlers.NewBalanceHandler(withdrawService, userLoginProvider, jwt, orderValidator)
+
+	router := NewRouter(userHandler, orderHandler, balanceHandler, jwt)
 
 	server := &http.Server{
 		Addr:         cfg.RunAddress,
@@ -70,10 +76,25 @@ func NewApplication(cfg *config.Config) (*Application, error) {
 		IdleTimeout:  60 * time.Second,
 	}
 
+	accrualClient, err := accrual.NewClientWithResponses(cfg.AccrualSystemAddress)
+	if err!= nil {
+		return nil, err
+	}
+
+	accr := services.NewAccrualProcessor(
+		accrualClient, 
+		s,  
+		cfg.AccrualInterval,
+		10,
+		1000,
+	)
+
+
 	return &Application{
 		cfg:    cfg,
 		server: server,
 		dbConn: dbConn,
+		accr: accr,
 	}, nil
 }
 
@@ -91,21 +112,24 @@ func (app *Application) Start(ctx context.Context) error {
 		}
 	}()
 
-	<-ctx.Done()
-	log.Println("Shutting down service...")
 
+	go func() {
+		defer wg.Done()
+		log.Printf("Accrual processing starting on %s", app.cfg.RunAddress)
+		app.accr.Start(ctx)
+	}()
+
+	<-ctx.Done()
+
+	log.Println("Shutting down service...")
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
 	if err := app.server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("HTTP server shutdown error: %v", err)
 	}
-
 	if err := app.dbConn.Close(); err != nil {
 		log.Printf("HTTP server shutdown error: %v", err)
 	}
-
 	wg.Wait()
-
 	return nil
 }

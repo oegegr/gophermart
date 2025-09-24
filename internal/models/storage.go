@@ -29,6 +29,11 @@ func (o *Order) ToApi(order Order) api.Order {
 		}
 }
 
+type Balance struct {
+	Current float32
+	Withdraw float32
+}
+
 var statusMap =  map[string]api.OrderStatus{
     "INVALID":   api.INVALID,
     "PROCESSED": api.PROCESSED,
