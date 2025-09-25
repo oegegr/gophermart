@@ -17,6 +17,8 @@ var (
 	ErrStorageOrdersNotFound                  = errors.New("orders not found")
 	ErrStorageOrderAlreadyUploadedByUser      = errors.New("order already uploaded by user")
 	ErrStorageOrderAlreadyUploadedByOtherUser = errors.New("order already uploaded by other user")
+	ErrStorageBalanceInsufficientBalance      = errors.New("insufficient balance")
+	ErrStorageWithdrawalsNotFound             = errors.New("withdrawals not found")
 )
 
 type Storage interface {
@@ -297,7 +299,7 @@ func (s *PGStorage) WithdrawUserBalance(ctx context.Context, withdraw models.Wit
 	}
 
 	if userBalance.Current < withdraw.Sum {
-		return errors.New("insufficient balance")
+		return ErrStorageBalanceInsufficientBalance
 	}
 
 	newBalance := userBalance.Current - withdraw.Sum
@@ -334,7 +336,7 @@ func (s *PGStorage) GetUserWithdrawals(ctx context.Context, login string) (*[]mo
 	if err != nil {
 		if err == sql.ErrNoRows {
 			log.Printf("user %s withdrawals not found", login)
-			return nil, ErrStorageOrdersNotFound
+			return nil, ErrStorageWithdrawalsNotFound
 		}
 		log.Printf("sql execution error: %v", err)
 		return nil, err

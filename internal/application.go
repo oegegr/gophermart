@@ -108,6 +108,8 @@ func (app *Application) Start(ctx context.Context) error {
 		}
 	}()
 
+	wg.Add(1)
+
 	go func() {
 		defer wg.Done()
 		log.Printf("Accrual processing starting on %s", app.cfg.RunAddress)

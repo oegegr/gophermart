@@ -16,7 +16,7 @@ type contextKey string
 const (
 	userIDKey           contextKey = "userID"
 	cookieName          string     = "auth"
-	authorizationHeader string     = "Authrorization"
+	authorizationHeader string     = "Authorization"
 )
 
 type AuthContextUserIDPovider struct{}
@@ -46,6 +46,7 @@ func AuthMiddleware(jwt services.JWTParser) func(http.Handler) http.Handler {
 
 			if err != nil {
 				http.Error(w, "bad authorization header", http.StatusUnauthorized)
+				return
 			}
 
 			if userID == "" {
@@ -53,12 +54,14 @@ func AuthMiddleware(jwt services.JWTParser) func(http.Handler) http.Handler {
 
 				if err != nil {
 					http.Error(w, "bad cookie", http.StatusUnauthorized)
+					return
 				}
 			}
 
 			if userID == "" {
 				log.Printf("Failed to create jwt token with userID %s: %v", userID, err)
 				http.Error(w, "", http.StatusUnauthorized)
+				return
 			}
 
 			token, err := jwt.CreateNewJWTToken(userID)
@@ -66,6 +69,7 @@ func AuthMiddleware(jwt services.JWTParser) func(http.Handler) http.Handler {
 			if err != nil {
 				log.Printf("Failed to create jwt token with userID %s: %v", userID, err)
 				http.Error(w, "", http.StatusInternalServerError)
+				return
 			}
 
 			SetAuthCookie(w, token)

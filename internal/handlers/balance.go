@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 
 	"github.com/oegegr/gophermart/internal/models/api"
 	"github.com/oegegr/gophermart/internal/services"
+	"github.com/oegegr/gophermart/internal/storage"
 )
 
 func NewBalanceHandler(
@@ -41,11 +43,7 @@ func (h *BalanceHandler) GetUserBalance(w http.ResponseWriter, r *http.Request) 
 
 	balance, err := h.withdrawService.GetUserBalance(ctx, login)
 	if err != nil {
-		if err.Error() == "user already exists" {
-			http.Error(w, "User already exists", http.StatusConflict)
-			return
-		}
-		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		http.Error(w, "Failed to get user balance", http.StatusInternalServerError)
 		return
 	}
 
@@ -77,11 +75,11 @@ func (h *BalanceHandler) WithdrawUserBalance(w http.ResponseWriter, r *http.Requ
 
 	err = h.withdrawService.WithdrawBalance(ctx, login, withdrawRequest)
 	if err != nil {
-		if err.Error() == "user already exists" {
-			http.Error(w, "User already exists", http.StatusConflict)
+		if errors.Is(err, storage.ErrStorageBalanceInsufficientBalance) {
+			http.Error(w, "insufficient balance", http.StatusPaymentRequired)
 			return
 		}
-		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		http.Error(w, "Failed to withdraw balance", http.StatusInternalServerError)
 		return
 	}
 
@@ -99,11 +97,11 @@ func (h *BalanceHandler) GetUserWithdrawals(w http.ResponseWriter, r *http.Reque
 
 	withdrawals, err := h.withdrawService.GetUserWithdrawals(ctx, login)
 	if err != nil {
-		if err.Error() == "user already exists" {
-			http.Error(w, "User already exists", http.StatusConflict)
+		if errors.Is(err, storage.ErrStorageWithdrawalsNotFound) {
+			http.Error(w, "Withdrawals not found", http.StatusNoContent)
 			return
 		}
-		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		http.Error(w, "failed to get user withdrawals", http.StatusInternalServerError)
 		return
 	}
 
@@ -111,7 +109,7 @@ func (h *BalanceHandler) GetUserWithdrawals(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(withdrawals); err != nil {
 		log.Printf("error encoding withdrawals: %v", err)
-		http.Error(w, "Failed to create user", http.StatusInternalServerError)
+		http.Error(w, "failed to get user withdrawals", http.StatusInternalServerError)
 		return
 	}
 }

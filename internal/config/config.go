@@ -14,7 +14,7 @@ type Config struct {
 	AccrualInterval      time.Duration
 }
 
-func LoadConfig() *Config {
+func LoadConfig() (*Config, error) {
 	cfg := &Config{}
 
 	flag.StringVar(&cfg.RunAddress, "a", "", "Address and port to run server")
@@ -35,12 +35,16 @@ func LoadConfig() *Config {
 	}
 
 	if envAccrualInterval := os.Getenv("ACCRUAL_INTERVAL"); envAccrualInterval != "" {
-		cfg.AccrualInterval, _ = time.ParseDuration(envAccrualInterval)
+		var err error
+		cfg.AccrualInterval, err = time.ParseDuration(envAccrualInterval)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if secret := os.Getenv("JWT_SECRET"); secret != "" {
 		cfg.JWTSecret = secret
 	}
 
-	return cfg
+	return cfg, nil
 }

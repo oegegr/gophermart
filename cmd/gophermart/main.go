@@ -12,9 +12,12 @@ import (
 )
 
 func main() {
-	cfg := config.LoadConfig()
-	app, err := internal.NewApplication(cfg)
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load application config: %v", err)
+	}
 
+	app, err := internal.NewApplication(cfg)
 	if err != nil {
 		log.Fatalf("Failed to create server: %v", err)
 	}
