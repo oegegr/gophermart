@@ -42,29 +42,28 @@ type PGStorage struct {
 }
 
 func (s *PGStorage) CreateUser(ctx context.Context, user models.User) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	stmt, err := tx.Prepare("INSERT INTO users (login, hash) VALUES ($1, $2)")
-	if err != nil {
-		log.Printf("sql request validation error: %v", err)
-		return err
-	}
-	defer stmt.Close()
+	return s.executeInTransaction(ctx, func(tx *sql.Tx) error {
 
-	_, err = stmt.ExecContext(ctx, user.Login, user.PasswordHash)
-
-	if err != nil {
-		if strings.Contains(err.Error(), "23505") {
-			return ErrStorageUserAlreadyExists
+		stmt, err := tx.Prepare("INSERT INTO users (login, hash) VALUES ($1, $2)")
+		if err != nil {
+			log.Printf("sql request validation error: %v", err)
+			return err
 		}
+		defer stmt.Close()
 
-		log.Printf("sql request execution error: %v", err)
-		rollbackTransaction(tx)
-		return err
-	}
-	return tx.Commit()
+		_, err = stmt.ExecContext(ctx, user.Login, user.PasswordHash)
+
+		if err != nil {
+			if strings.Contains(err.Error(), "23505") {
+				return ErrStorageUserAlreadyExists
+			}
+
+			log.Printf("sql request execution error: %v", err)
+			return err
+		}
+		return nil
+	})
+
 }
 
 func (s *PGStorage) FindUserByLogin(ctx context.Context, login string) (*models.User, error) {
@@ -117,7 +116,6 @@ func (s *PGStorage) CreateOrder(ctx context.Context, order models.Order) error {
 	stmt, err := tx.Prepare("INSERT INTO orders (order_number, accrual, status, uploaded_at, user_id) SELECT $1, $2, $3, $4, u.id FROM users u WHERE u.login = $5")
 	if err != nil {
 		log.Printf("sql request validation error: %v", err)
-		rollbackTransaction(tx)
 		return err
 	}
 	defer stmt.Close()
@@ -206,47 +204,38 @@ func (s *PGStorage) FindOrdersByStatus(ctx context.Context, status string) ([]mo
 }
 
 func (s *PGStorage) UpdateOrderStatus(ctx context.Context, status string, number string, accrual float32) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
+	return s.executeInTransaction(ctx, func(tx *sql.Tx) error {
+		stmt, err := tx.PrepareContext(ctx, "UPDATE orders SET status = $1, accrual = $2 WHERE order_number = $3")
+		if err != nil {
+			return err
+		}
+		defer stmt.Close()
 
-	stmt, err := tx.PrepareContext(ctx, "UPDATE orders SET status = $1, accrual = $2 WHERE order_number = $3")
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
+		_, err = stmt.ExecContext(ctx, status, accrual, number)
+		if err != nil {
+			log.Printf("sql execution error: %v", err)
+			return err
+		}
 
-	_, err = stmt.ExecContext(ctx, status, accrual, number)
-	if err != nil {
-		log.Printf("sql execution error: %v", err)
-		rollbackTransaction(tx)
-		return err
-	}
-
-	return tx.Commit()
+		return nil
+	})
 }
 
 func (s *PGStorage) UpdateUserBalance(ctx context.Context, login string, accrual float32) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
+	return s.executeInTransaction(ctx, func(tx *sql.Tx) error {
+		stmt, err := tx.PrepareContext(ctx, "UPDATE users SET balance = balance + $1 WHERE login = $2")
+		if err != nil {
+			return err
+		}
+		defer stmt.Close()
 
-	stmt, err := tx.PrepareContext(ctx, "UPDATE users SET balance = balance + $1 WHERE login = $2")
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	_, err = stmt.ExecContext(ctx, accrual, login)
-	if err != nil {
-		log.Printf("sql execution error: %v", err)
-		rollbackTransaction(tx)
-		return err
-	}
-
-	return tx.Commit()
+		_, err = stmt.ExecContext(ctx, accrual, login)
+		if err != nil {
+			log.Printf("sql execution error: %v", err)
+			return err
+		}
+		return nil
+	})
 }
 
 func (s *PGStorage) GetUserBalance(ctx context.Context, login string) (*models.Balance, error) {
@@ -271,53 +260,42 @@ func (s *PGStorage) GetUserBalance(ctx context.Context, login string) (*models.B
 }
 
 func (s *PGStorage) WithdrawUserBalance(ctx context.Context, withdraw models.Withdraw) error {
-	tx, err := s.db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to start transaction: %w", err)
-	}
+	return s.executeInTransaction(ctx, func(tx *sql.Tx) error {
+		updateBalance, err := tx.Prepare("UPDATE users SET balance = balance - $1 WHERE login = $2 AND balance >= $1")
+		if err != nil {
+			log.Printf("sql request validation error: %v", err)
+			return err
+		}
+		defer updateBalance.Close()
 
-	defer rollbackTransaction(tx)
+		insertWithdraw, err := tx.Prepare("INSERT INTO withdrawals (order_number, withdraw, processed_at, user_id) SELECT $1, $2, $3, u.id FROM users u WHERE u.login = $4")
+		if err != nil {
+			log.Printf("sql request validation error: %v", err)
+			return err
+		}
+		defer insertWithdraw.Close()
 
-	updateBalance, err := tx.Prepare("UPDATE users SET balance = balance - $1 WHERE login = $2 AND balance >= $1")
-	if err != nil {
-		log.Printf("sql request validation error: %v", err)
-		return err
-	}
-	defer updateBalance.Close()
+		result, err := updateBalance.ExecContext(ctx, withdraw.Sum, withdraw.Login)
 
-	insertWithdraw, err := tx.Prepare("INSERT INTO withdrawals (order_number, withdraw, processed_at, user_id) SELECT $1, $2, $3, u.id FROM users u WHERE u.login = $4")
-	if err != nil {
-		log.Printf("sql request validation error: %v", err)
-		return err
-	}
-	defer insertWithdraw.Close()
+		if err != nil {
+			return fmt.Errorf("failed to update user balance: %w", err)
+		}
 
-	result, err := updateBalance.ExecContext(ctx, withdraw.Sum, withdraw.Login)
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to get rows affected: %w", err)
+		}
 
-	if err != nil {
-		return fmt.Errorf("failed to update user balance: %w", err)
-	}
+		if rowsAffected == 0 {
+			return fmt.Errorf("failed to withdraw balance: %w", err)
+		}
 
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rowsAffected == 0 {
-		return fmt.Errorf("failed to withdraw balance: %w", err)
-	}
-
-	_, err = insertWithdraw.ExecContext(ctx, withdraw.Order, withdraw.Sum, withdraw.ProcessedAt, withdraw.Login)
-	if err != nil {
-		return fmt.Errorf("failed to insert withdrawal record: %w", err)
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return nil
+		_, err = insertWithdraw.ExecContext(ctx, withdraw.Order, withdraw.Sum, withdraw.ProcessedAt, withdraw.Login)
+		if err != nil {
+			return fmt.Errorf("failed to insert withdrawal record: %w", err)
+		}
+		return nil
+	})
 }
 
 func (s *PGStorage) GetUserWithdrawals(ctx context.Context, login string) (*[]models.Withdraw, error) {
@@ -356,9 +334,20 @@ func (s *PGStorage) GetUserWithdrawals(ctx context.Context, login string) (*[]mo
 	return &withdrawals, nil
 }
 
-func rollbackTransaction(tx *sql.Tx) {
-	err := tx.Rollback()
+func (s *PGStorage) executeInTransaction(ctx context.Context, txQuery func(tx *sql.Tx) error) error {
+	tx, err := s.db.Begin()
 	if err != nil {
-		log.Printf("error rolling back transaction: %v", err)
+		return fmt.Errorf("failed to start transaction: %w", err)
 	}
+
+	err = txQuery(tx)
+	if err != nil {
+		err := tx.Rollback()
+		if err != nil {
+			log.Printf("error rolling back transaction: %v", err)
+		}
+		return err
+	}
+
+	return tx.Commit()
 }

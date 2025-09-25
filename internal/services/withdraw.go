@@ -19,7 +19,7 @@ type WithdrawService interface {
 }
 
 var (
-	ErrServiceInsufficientUserBalance      = errors.New("insufficient balance")
+	ErrServiceInsufficientUserBalance = errors.New("insufficient balance")
 )
 
 func NewWithdrawServiceImpl(storage storage.Storage) *WithdrawServiceImpl {
@@ -48,7 +48,7 @@ func (s *WithdrawServiceImpl) WithdrawBalance(ctx context.Context, login string,
 	balance, err := s.storage.GetUserBalance(ctx, login)
 	if err != nil {
 		log.Printf("failed to get user %s balance: %v", login, err)
-		return err 
+		return err
 	}
 
 	if balance.Current < withdrawalRequest.Sum {
