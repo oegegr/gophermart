@@ -17,7 +17,7 @@ func main() {
 		log.Fatalf("Failed to load application config: %v", err)
 	}
 
-	app, err := internal.NewApplication(cfg)
+	app, err := internal.NewApplicationBuilder(cfg).Build()
 	if err != nil {
 		log.Fatalf("Failed to create server: %v", err)
 	}
