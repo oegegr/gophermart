@@ -17,7 +17,6 @@ var (
 	ErrStorageOrdersNotFound                  = errors.New("orders not found")
 	ErrStorageOrderAlreadyUploadedByUser      = errors.New("order already uploaded by user")
 	ErrStorageOrderAlreadyUploadedByOtherUser = errors.New("order already uploaded by other user")
-	ErrStorageBalanceInsufficientBalance      = errors.New("insufficient balance")
 	ErrStorageWithdrawalsNotFound             = errors.New("withdrawals not found")
 )
 
@@ -54,7 +53,7 @@ func (s *PGStorage) CreateUser(ctx context.Context, user models.User) error {
 	}
 	defer stmt.Close()
 
-	_, err = stmt.Exec(user.Login, user.PasswordHash)
+	_, err = stmt.ExecContext(ctx, user.Login, user.PasswordHash)
 
 	if err != nil {
 		if strings.Contains(err.Error(), "23505") {
@@ -279,7 +278,7 @@ func (s *PGStorage) WithdrawUserBalance(ctx context.Context, withdraw models.Wit
 
 	defer rollbackTransaction(tx)
 
-	updateBalance, err := tx.Prepare("UPDATE users SET balance = $1 WHERE login = $2")
+	updateBalance, err := tx.Prepare("UPDATE users SET balance = balance - $1 WHERE login = $2 AND balance >= $1")
 	if err != nil {
 		log.Printf("sql request validation error: %v", err)
 		return err
@@ -293,20 +292,19 @@ func (s *PGStorage) WithdrawUserBalance(ctx context.Context, withdraw models.Wit
 	}
 	defer insertWithdraw.Close()
 
-	userBalance, err := s.GetUserBalance(ctx, withdraw.Login)
-	if err != nil {
-		return fmt.Errorf("failed to get user balance: %w", err)
-	}
+	result, err := updateBalance.ExecContext(ctx, withdraw.Sum, withdraw.Login)
 
-	if userBalance.Current < withdraw.Sum {
-		return ErrStorageBalanceInsufficientBalance
-	}
-
-	newBalance := userBalance.Current - withdraw.Sum
-
-	_, err = updateBalance.ExecContext(ctx, newBalance, withdraw.Login)
 	if err != nil {
 		return fmt.Errorf("failed to update user balance: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("failed to withdraw balance: %w", err)
 	}
 
 	_, err = insertWithdraw.ExecContext(ctx, withdraw.Order, withdraw.Sum, withdraw.ProcessedAt, withdraw.Login)

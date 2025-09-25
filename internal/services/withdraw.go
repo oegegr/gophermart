@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -16,6 +17,10 @@ type WithdrawService interface {
 	WithdrawBalance(ctx context.Context, login string, withdrawalRequest api.WithdrawalRequest) error
 	GetUserWithdrawals(ctx context.Context, login string) (*[]api.Withdrawal, error)
 }
+
+var (
+	ErrServiceInsufficientUserBalance      = errors.New("insufficient balance")
+)
 
 func NewWithdrawServiceImpl(storage storage.Storage) *WithdrawServiceImpl {
 	return &WithdrawServiceImpl{
@@ -39,8 +44,20 @@ func (s *WithdrawServiceImpl) GetUserBalance(ctx context.Context, login string) 
 
 func (s *WithdrawServiceImpl) WithdrawBalance(ctx context.Context, login string, withdrawalRequest api.WithdrawalRequest) error {
 	processedAt := time.Now()
+
+	balance, err := s.storage.GetUserBalance(ctx, login)
+	if err != nil {
+		log.Printf("failed to get user %s balance: %v", login, err)
+		return err 
+	}
+
+	if balance.Current < withdrawalRequest.Sum {
+		log.Printf("insufficient user %s balance: %v", login, err)
+		return ErrServiceInsufficientUserBalance
+	}
+
 	w := models.Withdraw{Order: withdrawalRequest.Order, Sum: withdrawalRequest.Sum, Login: login, ProcessedAt: processedAt}
-	err := s.storage.WithdrawUserBalance(ctx, w)
+	err = s.storage.WithdrawUserBalance(ctx, w)
 	if err != nil {
 		log.Printf("failed to get user %s balance: %v", login, err)
 		return fmt.Errorf("failed to withdraw user %s balance %v", login, err)

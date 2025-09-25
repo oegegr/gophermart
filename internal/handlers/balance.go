@@ -75,7 +75,7 @@ func (h *BalanceHandler) WithdrawUserBalance(w http.ResponseWriter, r *http.Requ
 
 	err = h.withdrawService.WithdrawBalance(ctx, login, withdrawRequest)
 	if err != nil {
-		if errors.Is(err, storage.ErrStorageBalanceInsufficientBalance) {
+		if errors.Is(err, services.ErrServiceInsufficientUserBalance) {
 			http.Error(w, "insufficient balance", http.StatusPaymentRequired)
 			return
 		}
