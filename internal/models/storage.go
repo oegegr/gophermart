@@ -1,0 +1,49 @@
+package models
+
+import (
+	"time"
+
+	"github.com/oegegr/gophermart/internal/models/api"
+)
+
+type User struct {
+	Login        string
+	PasswordHash []byte
+}
+
+type Order struct {
+	Number     string
+	Accrual    float32
+	Status     string
+	UploadedAt time.Time
+	Login      string
+}
+
+func (o *Order) ToAPI(order Order) api.Order {
+	status := statusMap[order.Status]
+	return api.Order{
+		Number:     &order.Number,
+		Status:     &status,
+		Accrual:    &o.Accrual,
+		UploadedAt: &o.UploadedAt,
+	}
+}
+
+type Balance struct {
+	Current  float32
+	Withdraw float32
+}
+
+type Withdraw struct {
+	Order       string
+	Sum         float32
+	ProcessedAt time.Time
+	Login       string
+}
+
+var statusMap = map[string]api.OrderStatus{
+	"INVALID":    api.INVALID,
+	"PROCESSED":  api.PROCESSED,
+	"PROCESSING": api.PROCESSING,
+	"NEW":        api.NEW,
+}
